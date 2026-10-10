@@ -65,7 +65,7 @@
 <main id="home" class="page active">
   <div class="layout">
     <nav class="quick-nav" aria-label="Atalhos do catálogo">
-      <a href="#secao-premium">🌟 Destaques</a><a href="#secao-oferta">🔥 Ofertas</a><a href="#secao-pronta">📦 Pronta entrega</a><a href="#secao-encomenda">🛒 Encomendas</a>
+      <a href="#secao-oferta">🔥 Ofertas</a><a href="#secao-pronta">📦 Pronta entrega</a><a href="#secao-encomenda">🛒 Encomendas</a>
     </nav>
     <section id="secao-premium" class="section" hidden><div class="section-heading"><div><h2>Destaques especiais</h2><div class="section-mark"></div></div></div><div id="catalogo-home" class="catalogo"><div class="loading">Preparando os destaques…</div></div></section>
     <section id="secao-oferta" class="section" hidden><div class="section-heading"><div><h2>Ofertas</h2><div class="section-mark"></div></div></div><p class="section-note">✨ Produtos em oferta por tempo limitado</p><div id="lista-oferta"></div></section>
@@ -124,11 +124,12 @@ function numeroPreco(valor) {
 function preco(valor) { return numeroPreco(valor).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function criarCard(produto) {
   const nome=campo(produto,"Nome"), jsNome=escaparHtml(JSON.stringify(nome));
-  const cat=campo(produto,"Categoria"), oferta=normalizar(campo(produto,"Disponibilidade")).includes("ofert");
+  const disponibilidade=campo(produto,"Disponibilidade"), jsDisponibilidade=escaparHtml(JSON.stringify(disponibilidade));
+  const cat=campo(produto,"Categoria"), oferta=normalizar(disponibilidade).includes("ofert");
   const premium=normalizar(cat)==="premium", valor=numeroPreco(campo(produto,"Valor"));
   const foto=escaparHtml(imagemDrive(campo(produto,"Link da imagem")));
   const descricao=escaparHtml(campo(produto,"Descricao")||"Toque para ver o que vem na cesta");
-  return '<div class="card-wrapper"><article class="card'+(premium?' premium':'')+'" onclick="this.classList.toggle(\'flipped\')"><div class="card-face card-front"><div class="img-container">'+(oferta?'<span class="badge-offer">OFERTA</span>':'')+'<img src="'+foto+'" alt="'+escaparHtml(nome)+'" loading="lazy" onerror="this.src=\'https://via.placeholder.com/480x360?text=Sem+Imagem\'">'+(premium?'<span class="badge-premium">DESTAQUE</span>':'')+'</div><div class="card-info"><h3>'+escaparHtml(nome)+'</h3><p class="price">R$ '+preco(valor)+'</p><div class="card-actions"><button class="btn-add" type="button" onclick="event.stopPropagation(); adicionarAoCarrinho('+jsNome+','+valor+')">Adicionar</button><button class="btn-details" type="button" onclick="event.stopPropagation(); this.closest(\'.card\').classList.toggle(\'flipped\')">Ver cesta</button></div></div></div><div class="card-face card-back"><h3>O que vem na cesta</h3><div class="description">'+descricao+'</div><p class="back-hint">Toque para voltar ao produto</p></div></article></div>';
+  return '<div class="card-wrapper"><article class="card'+(premium?' premium':'')+'" onclick="this.classList.toggle(\'flipped\')"><div class="card-face card-front"><div class="img-container">'+(oferta?'<span class="badge-offer">OFERTA</span>':'')+'<img src="'+foto+'" alt="'+escaparHtml(nome)+'" loading="lazy" onerror="this.src=\'https://via.placeholder.com/480x360?text=Sem+Imagem\'">'+(premium?'<span class="badge-premium">DESTAQUE</span>':'')+'</div><div class="card-info"><h3>'+escaparHtml(nome)+'</h3><p class="price">R$ '+preco(valor)+'</p><div class="card-actions"><button class="btn-add" type="button" onclick="event.stopPropagation(); adicionarAoCarrinho('+jsNome+','+valor+','+jsDisponibilidade+')">Adicionar</button><button class="btn-details" type="button" onclick="event.stopPropagation(); this.closest(\'.card\').classList.toggle(\'flipped\')">Ver cesta</button></div></div></div><div class="card-face card-back"><h3>O que vem na cesta</h3><div class="description">'+descricao+'</div><p class="back-hint">Toque para voltar ao produto</p></div></article></div>';
 }
 function renderAgrupado(produtos) {
   const grupos=new Map();
@@ -190,8 +191,8 @@ function fecharModal() {
   document.getElementById("modal-shade").setAttribute("aria-hidden","true");
   document.body.style.overflow="";
 }
-function adicionarAoCarrinho(nome,valor) {
-  const atual=carrinho.find(i=>i.nome===nome); if(atual)atual.qtd++; else carrinho.push({nome:nome,preco:valor,qtd:1});
+function adicionarAoCarrinho(nome,valor,disponibilidade) {
+  const atual=carrinho.find(i=>i.nome===nome); if(atual)atual.qtd++; else carrinho.push({nome:nome,preco:valor,qtd:1,disponibilidade:disponibilidade});
   atualizarBadge();
   if(primeiraVezAdicionando){abrirModal('<div class="popup-added"><h2>Adicionado ao carrinho</h2><p><strong>'+escaparHtml(nome)+'</strong> agora está no seu pedido.</p><div class="popup-buttons"><button class="secondary" onclick="fecharModal()">Continuar escolhendo</button><button onclick="abrirCarrinho()">Ver carrinho</button></div></div>');primeiraVezAdicionando=false;}
 }
@@ -213,7 +214,9 @@ function enviarPedido(evento) {
   evento.preventDefault();
   const nome=document.getElementById("cliente-nome").value.trim(), telefone=document.getElementById("cliente-telefone").value.trim(), endereco=document.getElementById("cliente-endereco").value.trim(), pagamento=document.querySelector('input[name="pagamento"]:checked').value, obs=document.getElementById("pedido-obs").value.trim();
   const lista=carrinho.map((i,n)=>(n+1)+". "+i.nome+" - Qtd: "+i.qtd+" - R$ "+preco(i.preco*i.qtd)).join("\n"), total=carrinho.reduce((s,i)=>s+i.preco*i.qtd,0);
-  const mensagem="NOVO PEDIDO - D'CESTAS E PRESENTES\n\n"+lista+"\n\nTOTAL GERAL: R$ "+preco(total)+"\n\nNOME: "+nome+"\nTEL: "+telefone+"\nENDEREÇO: "+endereco+"\nPAGAMENTO: "+pagamento+"\nOBS: "+obs;
+  const disponibilidades=Array.from(new Set(carrinho.map(i=>i.disponibilidade||"Não informada")));
+  const disponibilidadePedido=disponibilidades.length===1?disponibilidades[0]:carrinho.map(i=>i.nome+": "+(i.disponibilidade||"Não informada")).join("; ");
+  const mensagem="NOVO PEDIDO - D'CESTAS E PRESENTES\nDISPONIBILIDADE: "+disponibilidadePedido+"\n\n"+lista+"\n\nTOTAL GERAL: R$ "+preco(total)+"\n\nDADOS DO CLIENTE\nNOME: "+nome+"\nTEL: "+telefone+"\nENDEREÇO: "+endereco+"\nPAGAMENTO: "+pagamento+"\nOBS: "+obs;
   window.open("https://wa.me/"+NUMERO_WHATSAPP+"?text="+encodeURIComponent(mensagem),"_blank","noopener");
   carrinho=[]; primeiraVezAdicionando=true; atualizarBadge(); fecharModal();
 }
