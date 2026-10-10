@@ -192,7 +192,7 @@ function fecharModal() {
   document.body.style.overflow="";
 }
 function adicionarAoCarrinho(nome,valor,disponibilidade) {
-  const atual=carrinho.find(i=>i.nome===nome); if(atual)atual.qtd++; else carrinho.push({nome:nome,preco:valor,qtd:1,disponibilidade:disponibilidade});
+  const atual=carrinho.find(i=>i.nome===nome&&i.preco===valor&&normalizar(i.disponibilidade)===normalizar(disponibilidade)); if(atual)atual.qtd++; else carrinho.push({nome:nome,preco:valor,qtd:1,disponibilidade:disponibilidade});
   atualizarBadge();
   if(primeiraVezAdicionando){abrirModal('<div class="popup-added"><h2>Adicionado ao carrinho</h2><p><strong>'+escaparHtml(nome)+'</strong> agora está no seu pedido.</p><div class="popup-buttons"><button class="secondary" onclick="fecharModal()">Continuar escolhendo</button><button onclick="abrirCarrinho()">Ver carrinho</button></div></div>');primeiraVezAdicionando=false;}
 }
@@ -213,10 +213,13 @@ function abrirCarrinho() {
 function enviarPedido(evento) {
   evento.preventDefault();
   const nome=document.getElementById("cliente-nome").value.trim(), telefone=document.getElementById("cliente-telefone").value.trim(), endereco=document.getElementById("cliente-endereco").value.trim(), pagamento=document.querySelector('input[name="pagamento"]:checked').value, obs=document.getElementById("pedido-obs").value.trim();
-  const lista=carrinho.map((i,n)=>(n+1)+". "+i.nome+" - Qtd: "+i.qtd+" - R$ "+preco(i.preco*i.qtd)).join("\n"), total=carrinho.reduce((s,i)=>s+i.preco*i.qtd,0);
-  const disponibilidades=Array.from(new Set(carrinho.map(i=>i.disponibilidade||"Não informada")));
-  const disponibilidadePedido=disponibilidades.length===1?disponibilidades[0]:carrinho.map(i=>i.nome+": "+(i.disponibilidade||"Não informada")).join("; ");
-  const mensagem="NOVO PEDIDO - D'CESTAS E PRESENTES\nDISPONIBILIDADE: "+disponibilidadePedido+"\n\n"+lista+"\n\nTOTAL GERAL: R$ "+preco(total)+"\n\nDADOS DO CLIENTE\nNOME: "+nome+"\nTEL: "+telefone+"\nENDEREÇO: "+endereco+"\nPAGAMENTO: "+pagamento+"\nOBS: "+obs;
+  const grupoDeDisponibilidade=valor=>{const status=normalizar(valor);if(status.includes("pronta"))return "PRONTA ENTREGA";if(status.includes("encomend"))return "ENCOMENDAS";if(status.includes("ofert"))return "OFERTAS";return String(valor||"OUTROS").trim().toLocaleUpperCase("pt-BR");};
+  const ordemGrupos=["PRONTA ENTREGA","ENCOMENDAS","OFERTAS"], produtosPorGrupo=new Map();
+  carrinho.forEach(item=>{const grupo=grupoDeDisponibilidade(item.disponibilidade);if(!produtosPorGrupo.has(grupo))produtosPorGrupo.set(grupo,[]);produtosPorGrupo.get(grupo).push(item);});
+  const gruposOrdenados=ordemGrupos.filter(grupo=>produtosPorGrupo.has(grupo)).concat(Array.from(produtosPorGrupo.keys()).filter(grupo=>!ordemGrupos.includes(grupo)));
+  const lista=gruposOrdenados.map(grupo=>grupo+"\n\n"+produtosPorGrupo.get(grupo).map((item,n)=>(n+1)+". "+item.nome+" - Qtd: "+item.qtd+" - R$ "+preco(item.preco*item.qtd)).join("\n"));
+  const total=carrinho.reduce((s,i)=>s+i.preco*i.qtd,0);
+  const mensagem=["NOVO PEDIDO - D'CESTAS E PRESENTES",lista.join("\n\n"),"TOTAL GERAL: R$ "+preco(total),"DADOS DO CLIENTE:","NOME: "+nome,"TEL: "+telefone,"ENDEREÇO: "+endereco,"PAGAMENTO: "+pagamento,"OBS: "+obs].join("\n\n");
   window.open("https://wa.me/"+NUMERO_WHATSAPP+"?text="+encodeURIComponent(mensagem),"_blank","noopener");
   carrinho=[]; primeiraVezAdicionando=true; atualizarBadge(); fecharModal();
 }
